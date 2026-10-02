@@ -7,6 +7,7 @@ from pathlib import Path
 
 STATUSES = ["Want to Read", "Reading", "Finished", "Dropped"]
 
+# SQL pieces used by the validation triggers in create_tables()
 _STATUS_LIST_SQL = ", ".join(f"'{status}'" for status in STATUSES)
 _INVALID_BOOK_SQL = f"NEW.status NOT IN ({_STATUS_LIST_SQL}) OR NEW.rating NOT BETWEEN 0 AND 5"
 
@@ -30,6 +31,7 @@ class Database:
         connection = sqlite3.connect(self.database_path)
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA foreign_keys = ON")
+        # `with connection` alone only commits/rolls back; the finally makes sure it is closed too
         try:
             with connection:
                 yield connection
@@ -82,6 +84,7 @@ class Database:
 
     def register(self, username: str, password: str) -> bool:
         username = username.strip()
+        # same rules as AuthenticationService.register (kept here as a safety net)
         if len(username) < 3 or len(password) < 8:
             return False
         salt = os.urandom(16)
@@ -100,6 +103,7 @@ class Database:
         """Returns {"id", "username"} if the credentials are valid, otherwise None."""
         with self.connect() as connection:
             row = connection.execute(
+                # COLLATE NOCASE: "Ann", "ann" and "ANN" all find the same account
                 "SELECT id, username, password FROM users WHERE username = ? COLLATE NOCASE",
                 (username.strip(),),
             ).fetchone()
@@ -109,6 +113,7 @@ class Database:
         attempt = self._hash(password, bytes.fromhex(salt_hex))
         if not hmac.compare_digest(attempt, stored_hash):
             return None
+        # return the username as it was registered, not as it was typed
         return {"id": row["id"], "username": row["username"]}
 
     # ---------- book log ----------
@@ -128,6 +133,7 @@ class Database:
 
     def search_books(self, user_id, keyword):
         like = f"%{_escape_like(keyword.strip())}%"
+        # ESCAPE '\' tells SQLite that a backslash before % or _ means "match it literally"
         with self.connect() as connection:
             return connection.execute(
                 "SELECT * FROM books WHERE user_id = ? "
@@ -147,6 +153,7 @@ class Database:
         with self.connect() as connection:
             row = connection.execute(
                 "SELECT 1 FROM books WHERE user_id = ? "
+                # `id IS NOT ?` skips the book being edited; with None it matches every book
                 "AND title = ? COLLATE NOCASE AND author = ? COLLATE NOCASE AND id IS NOT ?",
                 (user_id, title.strip(), author.strip(), exclude_id),
             ).fetchone()
@@ -163,6 +170,7 @@ class Database:
                 f"UPDATE books SET {assignments} WHERE id = ? AND user_id = ?",
                 (*fields.values(), book_id, user_id),
             )
+            # read rowcount before the connection closes
             return cursor.rowcount > 0
 
     def remove_book(self, user_id, book_id) -> bool:
@@ -182,6 +190,7 @@ class Database:
                 "SELECT status, COUNT(*) AS n FROM books WHERE user_id = ? GROUP BY status",
                 (user_id,),
             ).fetchall()
+            # group authors ignoring case so "Ann Author" and "ann author" count together
             top = connection.execute(
                 "SELECT author, COUNT(*) AS n FROM books WHERE user_id = ? "
                 "GROUP BY author COLLATE NOCASE ORDER BY n DESC, author COLLATE NOCASE LIMIT 1",

@@ -41,6 +41,7 @@ class AuthenticationView(QDialog):
         self.login_username = QLineEdit()
         self.login_password = QLineEdit()
         self.login_password.setEchoMode(QLineEdit.EchoMode.Password)
+        # pressing Enter in either box logs in
         self.login_username.returnPressed.connect(self.handle_login)
         self.login_password.returnPressed.connect(self.handle_login)
         button = QPushButton("Log In")
@@ -62,6 +63,7 @@ class AuthenticationView(QDialog):
         self.reg_password.setPlaceholderText("At least 8 characters")
         for field in (self.reg_password, self.reg_confirm):
             field.setEchoMode(QLineEdit.EchoMode.Password)
+        # pressing Enter in any register box submits the form
         for field in (self.reg_username, self.reg_password, self.reg_confirm):
             field.returnPressed.connect(self.handle_register)
         button = QPushButton("Create Account")
@@ -78,6 +80,7 @@ class AuthenticationView(QDialog):
             self.authentication.login(self.login_username.text(), self.login_password.text())
         except AuthenticationError as error:
             self.message.setText(str(error))
+            # clear the wrong password so the user can retype it straight away
             self.login_password.clear()
             self.login_password.setFocus()
             return

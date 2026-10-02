@@ -29,6 +29,7 @@ class BookTable(QTableWidget):
         self.blockSignals(True)
         self.setRowCount(len(books))
         for r, book in enumerate(books):
+            # rating 0 means the book hasn't been rated yet
             stars = "★" * book["rating"] + "☆" * (5 - book["rating"]) if book["rating"] else "Unrated"
             values = [book["id"], book["title"], book["author"], book["genre"], book["status"], stars]
             for c, value in enumerate(values):
@@ -64,6 +65,7 @@ class BookForm(QWidget):
         self.title = QLineEdit()
         self.author = QLineEdit()
         self.genre = QLineEdit()
+        # stop typing at the same limit the service checks
         for field in (self.title, self.author, self.genre):
             field.setMaxLength(MAX_TEXT_LENGTH)
         self.status = QComboBox()
@@ -86,6 +88,7 @@ class BookForm(QWidget):
                 self.status.currentText(), self.rating.value(), self.notes.toPlainText())
 
     def has_changes(self, book):
+        """True if the form no longer matches the saved book (i.e. there are unsaved edits)."""
         original = (book["title"], book["author"], book["genre"],
                     book["status"], book["rating"], book["notes"])
         return self.values() != original
@@ -204,6 +207,7 @@ class BookView(QWidget):
 
     # ----- refresh -----
     def refresh(self):
+        # start the Update tab fresh so old text never sits next to a disabled Save button
         self.editing_book = None
         self.update_form.clear()
         books = self.books.view_books()
@@ -220,13 +224,14 @@ class BookView(QWidget):
 
     def refresh_stats(self):
         s = self.books.summary_stats()
+        # escape() stops characters like < and & in book data from breaking the HTML below
         rows = "".join(
             f"<tr><td>{escape(k)}</td><td><b>{v}</b></td></tr>" for k, v in s["by_status"].items()
         )
         avg = s["average_rating"] if s["average_rating"] is not None else "n/a"
         if s["top_author"]:
             author, count = s["top_author"]
-            top = f"{escape(author)} ({count} {'book' if count == 1 else 'books'})"
+            top = f"{escape(author)} ({count} {'book' if count == 1 else 'books'})"  # 1 book / 2 books
         else:
             top = "n/a"
         self.stats_label.setText(
@@ -251,11 +256,12 @@ class BookView(QWidget):
         QMessageBox.information(self, "Chapterd", "Book added!")
 
     def load_for_update(self):
+        """Fills the Update form with the selected book, asking first if edits would be lost."""
         book = self.update_table.selected_book()
         current = self.editing_book
         if current is not None and self.update_form.has_changes(current):
             if book is not None and book["id"] == current["id"]:
-                return
+                return  # same book still selected, keep the edits
             answer = QMessageBox.question(
                 self, "Unsaved Changes",
                 f'Discard your unsaved changes to "{current["title"]}"?',
@@ -263,6 +269,7 @@ class BookView(QWidget):
                 QMessageBox.StandardButton.No,
             )
             if answer != QMessageBox.StandardButton.Yes:
+                # user chose to keep editing: put the selection back on the original book
                 self.update_table.select_book(current["id"])
                 return
         self.editing_book = book
@@ -273,7 +280,7 @@ class BookView(QWidget):
         self.update_button.setEnabled(book is not None)
 
     def update_book(self):
-        book = self.editing_book
+        book = self.editing_book  # the book loaded in the form, not just whatever row is selected
         if not book:
             return
         try:

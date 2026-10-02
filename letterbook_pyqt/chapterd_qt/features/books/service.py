@@ -23,6 +23,7 @@ class BookService:
             raise BookError("Title is required.")
         if not author.strip():
             raise BookError("Author is required.")
+        # length limits so one huge entry can't bloat the database or the table
         for label, value in (("Title", title), ("Author", author), ("Genre", genre)):
             if len(value.strip()) > MAX_TEXT_LENGTH:
                 raise BookError(f"{label} must be at most {MAX_TEXT_LENGTH} characters.")
@@ -34,6 +35,7 @@ class BookService:
             raise BookError("Rating must be between 0 and 5.")
 
     def _check_duplicate(self, title, author, exclude_id=None):
+        """Blocks logging the same title + author twice (exclude_id = the book being edited)."""
         if self.database.book_exists(self.user_id, title, author, exclude_id):
             raise BookError(f'"{title.strip()}" by {author.strip()} is already in your log.')
 
