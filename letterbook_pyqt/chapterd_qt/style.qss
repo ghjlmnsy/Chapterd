@@ -1,0 +1,48 @@
+QWidget {
+    font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    font-size: 13px;
+    color: #2b2320;
+}
+QDialog, #mainContent, #authDialog { background: #faf5ee; }
+
+#appHeader { background: #5b3a29; border-radius: 12px; }
+#appHeader #appTitle { color: #fff; }
+#appHeader #appSubtitle { color: #e8d5c4; }
+#appTitle { font-size: 22px; font-weight: 700; color: #5b3a29; }
+#appSubtitle { font-size: 12px; color: #8a7466; }
+#statsLabel { color: #8a7466; font-weight: 600; }
+#messageLabel { color: #b23b3b; }
+
+QLineEdit, QComboBox, QSpinBox, QPlainTextEdit {
+    background: #fff;
+    border: 1px solid #d9c9b8;
+    border-radius: 6px;
+    padding: 6px 8px;
+}
+QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QPlainTextEdit:focus {
+    border: 1px solid #b5651d;
+}
+
+QPushButton {
+    background: #efe3d3;
+    border: 1px solid #d9c9b8;
+    border-radius: 6px;
+    padding: 8px 16px;
+}
+QPushButton:hover { background: #e6d4bd; }
+QPushButton:disabled { color: #b5a698; background: #f4ede3; }
+#primaryButton { background: #b5651d; color: #fff; border: none; font-weight: 600; }
+#primaryButton:hover { background: #9c5416; }
+#dangerButton { background: #fff; color: #b23b3b; border: 1px solid #b23b3b; }
+#dangerButton:hover { background: #fbeaea; }
+#logoutButton { background: transparent; color: #fff; border: 1px solid #e8d5c4; }
+#logoutButton:hover { background: #7a5240; }
+
+QTabWidget::pane { border: 1px solid #d9c9b8; border-radius: 8px; background: #fffdf9; top: -1px; }
+QTabBar::tab { background: #efe3d3; padding: 8px 18px; border-top-left-radius: 6px; border-top-right-radius: 6px; margin-right: 2px; }
+QTabBar::tab:selected { background: #fffdf9; font-weight: 600; }
+
+QTableWidget { background: #fff; border: 1px solid #d9c9b8; gridline-color: #f0e6da; selection-background-color: #f2d9bd; selection-color: #2b2320; }
+QHeaderView::section { background: #efe3d3; border: none; padding: 6px; font-weight: 600; }
+
+#statsText { color: #2b2320; font-size: 14px; }
