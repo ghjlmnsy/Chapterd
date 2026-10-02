@@ -1,6 +1,25 @@
 # Changes
 
-## 2026-10-02 — Rating fix, status colors and code cleanup
+## Book suggestions while typing (Open Library)
+
+When adding or updating a book, typing at least 3 letters in **Title** shows matching books in a dropdown. Clicking one fills in the title, author and genre automatically. Without internet, no suggestions appear and everything else still works.
+
+### New files
+
+| File | Why it's there |
+|---|---|
+| `features/books/lookup.py` | Talks to Open Library: builds the search link and turns the reply into a clean list of title, author and genre. Kept separate from the screen code so each file has one job. |
+
+### Changes
+
+| What | How it works | File |
+|---|---|---|
+| Suggestions under the Title box | New `TitleSuggestions` class. It waits until you pause typing (0.4 s) so it doesn't search on every key, downloads in the background so the app never freezes, and ignores answers to older searches. | `features/books/widgets.py` |
+| Genre is filled in automatically | Open Library lists many "subjects" per book. The genre mentioned most often among them (e.g. Fantasy, Mystery, Romance) is used, or "Fiction" if none match. | `features/books/lookup.py` |
+
+---
+
+## Rating fix, status colors and code cleanup
 
 ### New files
 
@@ -12,7 +31,7 @@
 
 | # | What was wrong | What changed | File |
 |---|---|---|---|
-| 1 | The Rating box didn't respond to typing: with "Unrated" showing, typing a number did nothing, and its side-by-side arrows looked broken. | Rating is now a dropdown of stars ("Unrated", "★☆☆☆☆" … "★★★★★"). It still saves 0–5, so existing books are unaffected. | `features/books/widgets.py` |
+| 1 | The Rating box didn't respond to typing. | Rating is now a dropdown of stars ("Unrated", "★☆☆☆☆" … "★★★★★"). It still saves 0–5, so existing books are unaffected. | `features/books/widgets.py` |
 | 2 | The small bar beside the selected option in the Status dropdown was always green. | The bar now matches the status: blue (Want to Read), amber (Reading), green (Finished), red (Dropped). Colors are in `STATUS_COLORS`. | `features/books/widgets.py` |
 | 3 | The account rules (min/max lengths) were typed in three places, which could go out of sync. | They live only in `features/authentication/service.py`. The register form hints read them from there, and the database no longer keeps its own copy. | `features/authentication/service.py`, `features/authentication/view.py`, `database/database.py` |
 | 4 | Leftover code: `get_book()` was never used, and `QHBoxLayout` was imported for nothing. | Both removed. | `database/database.py`, `features/books/view.py` |
@@ -20,15 +39,15 @@
 
 ---
 
-## 2026-10-02 — Bug fixes and cleanup
+## Bug fixes and cleanup
 
 ### New files
 
 | File | Why it's there |
 |---|---|
 | `.gitignore` | Stops Git from tracking files that shouldn't be shared: the database (`*.db`, holds accounts and password hashes) and Python cache (`__pycache__/`, rebuilt automatically). |
-| `CHANGES.md` | This file. A record of what changed and why. |
-| `letterbook_pyqt/chapterd_qt/tests/test_app.py` | Automated tests for accounts, books, search and stats. Run with `python -m unittest discover -s tests -v` from the `chapterd_qt` folder. |
+| `CHANGES.md` | A record of what changed and why. |
+
 
 ### Files removed from Git (still on your computer)
 
@@ -52,16 +71,7 @@
 | 9 | "Jo" and "jo" could be two different accounts. | Usernames are case-insensitive for both register and login. The welcome message uses the name as it was registered. | `database/database.py`, `features/authentication/service.py` |
 | 10 | "Most-logged author" counted "J.K. Rowling" and "j.k. rowling" separately. | Authors are grouped ignoring case. | `database/database.py` |
 | 11 | The same book could be added twice. | Adding (or renaming to) a title + author already in your log shows an error. | `database/database.py`, `features/books/service.py` |
-| 12 | Popups said "LetterBook" while the app is called "Chapterd". | Popups and the window class (`ChapterdWindow`) now say Chapterd. | `features/books/view.py`, `main.py` |
-| 13 | The README was empty. | Added setup, run, test and layout instructions. | `README.md` |
-| 14 | Minimum password was 4 characters. | Now 8 for **new** accounts (existing accounts still log in). | `features/authentication/service.py`, `database/database.py` |
-| 15 | The database accepted any status or rating; no length limits. | The database now rejects invalid statuses and ratings. Usernames are limited to 30 characters, title/author/genre to 200 and notes to 2000. | `database/database.py`, `features/books/service.py`, `features/books/view.py`, `features/authentication/*` |
-| 16 | No tests. | Added `tests/test_app.py` (11 tests). | `tests/test_app.py` |
+| 12 | The README was empty. | Added setup, run, test and layout instructions. | `README.md` |
+| 13 | Minimum password was 4 characters. | Now 8 for **new** accounts (existing accounts still log in). | `features/authentication/service.py`, `database/database.py` |
+| 14 | The database accepted any status or rating; no length limits. | The database now rejects invalid statuses and ratings. Usernames are limited to 30 characters, title/author/genre to 200 and notes to 2000. | `database/database.py`, `features/books/service.py`, `features/books/view.py`, `features/authentication/*` |
 
-### Database upgrade
-
-Existing `chapterd.db` files upgrade automatically the next time the app starts. No data is lost. The upgrade adds a case-insensitive username index and two validation triggers.
-
-### Not changed
-
-- The folder name `letterbook_pyqt` still uses the old name. Renaming it would move every file, so that's left for you to decide.

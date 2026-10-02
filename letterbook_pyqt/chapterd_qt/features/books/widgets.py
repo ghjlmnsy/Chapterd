@@ -1,11 +1,13 @@
-"""Reusable book widgets (table, form, status dropdown) used by the screens in view.py."""
-from PyQt6.QtCore import Qt
+"""Reusable book widgets (table, form, status dropdown, title suggestions) used by view.py."""
+from PyQt6.QtCore import QObject, QStringListModel, Qt, QTimer, QUrl
 from PyQt6.QtGui import QColor, QPalette
+from PyQt6.QtNetwork import QNetworkAccessManager, QNetworkReply, QNetworkRequest
 from PyQt6.QtWidgets import (
-    QAbstractItemView, QComboBox, QFormLayout, QHeaderView, QLineEdit, QPlainTextEdit,
-    QTableWidget, QTableWidgetItem, QWidget,
+    QAbstractItemView, QComboBox, QCompleter, QFormLayout, QHeaderView, QLineEdit,
+    QPlainTextEdit, QTableWidget, QTableWidgetItem, QWidget,
 )
 
+from features.books.lookup import parse_results, search_url
 from features.books.service import MAX_TEXT_LENGTH, STATUSES
 
 COLUMNS = ["ID", "Title", "Author", "Genre", "Status", "Rating"]
@@ -88,6 +90,62 @@ class StatusComboBox(QComboBox):
         view.setPalette(palette)
 
 
+class TitleSuggestions(QObject):
+    """Shows Open Library books under the Title box while typing; picking one fills author and genre."""
+
+    def __init__(self, title, author, genre):
+        super().__init__(title)
+        self.title, self.author, self.genre = title, author, genre
+        self.books = {}    # suggestion text -> {"title", "author", "genre"}
+        self.reply = None  # the search currently waiting for an answer
+        self.network = QNetworkAccessManager(self)  # downloads in the background, so the app never freezes
+        # wait until the user pauses typing for 400 ms, instead of searching on every key
+        self.timer = QTimer(self, singleShot=True, interval=400)
+        self.timer.timeout.connect(self.search)
+        self.model = QStringListModel(self)
+        self.completer = QCompleter(self.model, self)
+        # show every result as-is (Open Library already matched them to what was typed)
+        self.completer.setCompletionMode(QCompleter.CompletionMode.UnfilteredPopupCompletion)
+        self.completer.activated.connect(self.pick)
+        self.completer.popup().setObjectName("titleSuggestions")  # styled in style.qss
+        title.setCompleter(self.completer)
+        title.textEdited.connect(self.timer.start)  # textEdited = only real typing, not setText()
+
+    def search(self):
+        text = self.title.text().strip()
+        if len(text) < 3:
+            return
+        if self.reply:
+            self.reply.abort()  # an older search is outdated now
+        request = QNetworkRequest(QUrl(search_url(text)))
+        request.setRawHeader(b"User-Agent", b"Chapterd/1.0 (personal book log)")  # Open Library asks for this
+        self.reply = self.network.get(request)
+        self.reply.finished.connect(lambda reply=self.reply: self.show_results(reply))
+
+    def show_results(self, reply):
+        reply.deleteLater()
+        if reply is not self.reply or reply.error() != QNetworkReply.NetworkError.NoError:
+            return  # outdated, or offline: just show no suggestions
+        self.reply = None
+        books = parse_results(bytes(reply.readAll()))
+        self.books = {f"{b['title']} — {b['author']}" if b["author"] else b["title"]: b for b in books}
+        self.model.setStringList(list(self.books))
+        if self.books and self.title.hasFocus():
+            self.completer.complete()
+
+    def pick(self, text):
+        book = self.books.get(text)
+        if book:
+            # wait one moment: the completer first puts the whole "Title — Author" text in the box
+            QTimer.singleShot(0, lambda: self.fill(book))
+
+    def fill(self, book):
+        self.title.setText(book["title"])
+        self.author.setText(book["author"])
+        if book["genre"]:
+            self.genre.setText(book["genre"])
+
+
 class BookForm(QWidget):
     def __init__(self):
         super().__init__()
@@ -99,6 +157,7 @@ class BookForm(QWidget):
         # stop typing at the same limit the service checks
         for field in (self.title, self.author, self.genre):
             field.setMaxLength(MAX_TEXT_LENGTH)
+        self.suggestions = TitleSuggestions(self.title, self.author, self.genre)
         self.status = StatusComboBox()
         self.rating = QComboBox()
         for rating in range(6):

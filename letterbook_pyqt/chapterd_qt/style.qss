@@ -47,3 +47,8 @@ QTableWidget { background: #fff; border: 1px solid #d9c9b8; gridline-color: #f0e
 QHeaderView::section { background: #efe3d3; border: none; padding: 6px; font-weight: 600; }
 
 #statsText { color: #2b2320; font-size: 14px; }
+
+/* the title suggestions list under the Title box (Add/Update Book) */
+#titleSuggestions { background: #fff; color: #2b2320; border: 1px solid #d9c9b8; padding: 4px; outline: none; }
+#titleSuggestions::item { padding: 6px 8px; border-radius: 4px; }
+#titleSuggestions::item:selected, #titleSuggestions::item:hover { background: #f2d9bd; color: #2b2320; }
