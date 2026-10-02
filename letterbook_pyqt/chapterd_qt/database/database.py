@@ -5,13 +5,6 @@ import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
 
-STATUSES = ["Want to Read", "Reading", "Finished", "Dropped"]
-
-# SQL pieces used by the validation triggers in create_tables()
-_STATUS_LIST_SQL = ", ".join(f"'{status}'" for status in STATUSES)
-_INVALID_BOOK_SQL = f"NEW.status NOT IN ({_STATUS_LIST_SQL}) OR NEW.rating NOT BETWEEN 0 AND 5"
-
-
 def _escape_like(text: str) -> str:
     """Makes %, _ and \\ match literally inside a LIKE pattern (used with ESCAPE '\\')."""
     return text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
@@ -38,7 +31,10 @@ class Database:
         finally:
             connection.close()
 
-    def create_tables(self) -> None:
+    def create_tables(self, statuses: list[str]) -> None:
+        """Creates the tables. `statuses` (from features/books/service.py) are the only allowed ones."""
+        status_list = ", ".join(f"'{status}'" for status in statuses)
+        invalid_book = f"NEW.status NOT IN ({status_list}) OR NEW.rating NOT BETWEEN 0 AND 5"
         with self.connect() as connection:
             connection.executescript(
                 f"""
@@ -64,13 +60,16 @@ class Database:
                     ON users (username COLLATE NOCASE);
 
                 -- the database itself rejects invalid statuses and ratings
-                CREATE TRIGGER IF NOT EXISTS books_validate_insert
-                    BEFORE INSERT ON books WHEN {_INVALID_BOOK_SQL}
+                -- (dropped and re-made every start so a changed status list takes effect)
+                DROP TRIGGER IF EXISTS books_validate_insert;
+                DROP TRIGGER IF EXISTS books_validate_update;
+                CREATE TRIGGER books_validate_insert
+                    BEFORE INSERT ON books WHEN {invalid_book}
                 BEGIN
                     SELECT RAISE(ABORT, 'invalid book status or rating');
                 END;
-                CREATE TRIGGER IF NOT EXISTS books_validate_update
-                    BEFORE UPDATE ON books WHEN {_INVALID_BOOK_SQL}
+                CREATE TRIGGER books_validate_update
+                    BEFORE UPDATE ON books WHEN {invalid_book}
                 BEGIN
                     SELECT RAISE(ABORT, 'invalid book status or rating');
                 END;
@@ -84,9 +83,6 @@ class Database:
 
     def register(self, username: str, password: str) -> bool:
         username = username.strip()
-        # same rules as AuthenticationService.register (kept here as a safety net)
-        if len(username) < 3 or len(password) < 8:
-            return False
         salt = os.urandom(16)
         stored = f"{salt.hex()}${self._hash(password, salt)}"
         try:
@@ -117,7 +113,7 @@ class Database:
         return {"id": row["id"], "username": row["username"]}
 
     # ---------- book log ----------
-    def add_book(self, user_id, title, author, genre="", status="Want to Read", rating=0, notes=""):
+    def add_book(self, user_id, title, author, genre, status, rating, notes):
         with self.connect() as connection:
             connection.execute(
                 "INSERT INTO books (user_id, title, author, genre, status, rating, notes) "
@@ -141,12 +137,6 @@ class Database:
                 "OR genre LIKE ? ESCAPE '\\') ORDER BY id",
                 (user_id, like, like, like),
             ).fetchall()
-
-    def get_book(self, user_id, book_id):
-        with self.connect() as connection:
-            return connection.execute(
-                "SELECT * FROM books WHERE id = ? AND user_id = ?", (book_id, user_id)
-            ).fetchone()
 
     def book_exists(self, user_id, title, author, exclude_id=None) -> bool:
         """True if this user already logged a book with the same title and author (any case)."""
@@ -196,11 +186,10 @@ class Database:
                 "GROUP BY author COLLATE NOCASE ORDER BY n DESC, author COLLATE NOCASE LIMIT 1",
                 (user_id,),
             ).fetchone()
-        counts = {status: 0 for status in STATUSES}
-        counts.update({row["status"]: row["n"] for row in by_status})
         return {
             "total": total,
             "average_rating": round(avg, 2) if avg else None,
-            "by_status": counts,
+            # only statuses that have books; BookService adds the zeros
+            "by_status": {row["status"]: row["n"] for row in by_status},
             "top_author": (top["author"], top["n"]) if top else None,
         }

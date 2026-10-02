@@ -16,7 +16,7 @@ from PyQt6.QtWidgets import (
 from database.database import Database
 from features.authentication.service import AuthenticationService
 from features.authentication.view import AuthenticationView
-from features.books.service import BookService
+from features.books.service import STATUSES, BookService
 from features.books.view import BookView
 
 
@@ -82,7 +82,7 @@ class ChapterdWindow(QDialog):
 
 def main():
     database = Database()
-    database.create_tables()
+    database.create_tables(STATUSES)
 
     app = QApplication(sys.argv)
     app.setStyleSheet(Path(__file__).with_name("style.qss").read_text(encoding="utf-8"))

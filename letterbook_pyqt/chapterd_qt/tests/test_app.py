@@ -9,14 +9,14 @@ from pathlib import Path
 
 from database.database import Database
 from features.authentication.service import AuthenticationError, AuthenticationService
-from features.books.service import BookError, BookService
+from features.books.service import STATUSES, BookError, BookService
 
 
 class AppTestCase(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.database = Database(Path(self.tmp.name) / "test.db")
-        self.database.create_tables()
+        self.database.create_tables(STATUSES)
         self.auth = AuthenticationService(self.database)
         self.books = BookService(self.database, self.auth)
 
@@ -38,9 +38,9 @@ class DatabaseTests(AppTestCase):
     def test_invalid_status_and_rating_rejected_by_database(self):
         user = self.log_in()
         with self.assertRaises(sqlite3.IntegrityError):
-            self.database.add_book(user["id"], "T", "A", status="Nope")
+            self.database.add_book(user["id"], "T", "A", "", "Nope", 0, "")
         with self.assertRaises(sqlite3.IntegrityError):
-            self.database.add_book(user["id"], "T", "A", rating=9)
+            self.database.add_book(user["id"], "T", "A", "", "Reading", 9, "")
 
     def test_search_treats_wildcards_literally(self):
         self.log_in()

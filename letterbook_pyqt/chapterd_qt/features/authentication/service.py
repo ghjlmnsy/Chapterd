@@ -1,6 +1,6 @@
 from database.database import Database
 
-# account rules, shared with the register form in view.py
+# account rules: (the register form in view.py reads these too)
 MIN_USERNAME_LENGTH = 3
 MAX_USERNAME_LENGTH = 30
 MIN_PASSWORD_LENGTH = 8

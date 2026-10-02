@@ -1,4 +1,7 @@
-from database.database import STATUSES, Database
+from database.database import Database
+
+# the reading statuses, in dropdown order 
+STATUSES = ["Want to Read", "Reading", "Finished", "Dropped"]
 
 MAX_TEXT_LENGTH = 200  # title, author, genre
 MAX_NOTES_LENGTH = 2000
@@ -64,4 +67,7 @@ class BookService:
             raise BookError("Book not found.")
 
     def summary_stats(self):
-        return self.database.summary_stats(self.user_id)
+        stats = self.database.summary_stats(self.user_id)
+        # list every status in order, with 0 for ones that have no books yet
+        stats["by_status"] = {status: stats["by_status"].get(status, 0) for status in STATUSES}
+        return stats

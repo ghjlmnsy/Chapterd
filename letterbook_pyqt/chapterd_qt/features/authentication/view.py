@@ -2,7 +2,9 @@ from PyQt6.QtWidgets import (
     QDialog, QFormLayout, QLabel, QLineEdit, QPushButton, QTabWidget, QVBoxLayout, QWidget,
 )
 
-from features.authentication.service import MAX_USERNAME_LENGTH, AuthenticationError
+from features.authentication.service import (
+    MAX_USERNAME_LENGTH, MIN_PASSWORD_LENGTH, MIN_USERNAME_LENGTH, AuthenticationError,
+)
 
 
 class AuthenticationView(QDialog):
@@ -61,8 +63,8 @@ class AuthenticationView(QDialog):
         self.reg_password = QLineEdit()
         self.reg_confirm = QLineEdit()
         self.reg_username.setMaxLength(MAX_USERNAME_LENGTH)
-        self.reg_username.setPlaceholderText(f"3-{MAX_USERNAME_LENGTH} characters")
-        self.reg_password.setPlaceholderText("At least 8 characters")
+        self.reg_username.setPlaceholderText(f"{MIN_USERNAME_LENGTH}-{MAX_USERNAME_LENGTH} characters")
+        self.reg_password.setPlaceholderText(f"At least {MIN_PASSWORD_LENGTH} characters")
         for field in (self.reg_password, self.reg_confirm):
             field.setEchoMode(QLineEdit.EchoMode.Password)
         # pressing Enter in any register box submits the form

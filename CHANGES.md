@@ -1,5 +1,25 @@
 # Changes
 
+## 2026-10-02 — Rating fix, status colors and code cleanup
+
+### New files
+
+| File | Why it's there |
+|---|---|
+| `features/books/widgets.py` | The reusable book building blocks (book table, book form, status dropdown, star helper, status colors), moved out of `view.py`. `view.py` was getting crowded; now it only holds the book screen itself (341 → 210 lines). |
+
+### Fixes and improvements
+
+| # | What was wrong | What changed | File |
+|---|---|---|---|
+| 1 | The Rating box didn't respond to typing: with "Unrated" showing, typing a number did nothing, and its side-by-side arrows looked broken. | Rating is now a dropdown of stars ("Unrated", "★☆☆☆☆" … "★★★★★"). It still saves 0–5, so existing books are unaffected. | `features/books/widgets.py` |
+| 2 | The small bar beside the selected option in the Status dropdown was always green. | The bar now matches the status: blue (Want to Read), amber (Reading), green (Finished), red (Dropped). Colors are in `STATUS_COLORS`. | `features/books/widgets.py` |
+| 3 | The account rules (min/max lengths) were typed in three places, which could go out of sync. | They live only in `features/authentication/service.py`. The register form hints read them from there, and the database no longer keeps its own copy. | `features/authentication/service.py`, `features/authentication/view.py`, `database/database.py` |
+| 4 | Leftover code: `get_book()` was never used, and `QHBoxLayout` was imported for nothing. | Both removed. | `database/database.py`, `features/books/view.py` |
+| 5 | The list of reading statuses (`STATUSES`) lived in the database file, though it's a book rule. | Moved to `features/books/service.py`. `main.py` passes it to `database.create_tables(STATUSES)`, so the database's status check always follows this one list. | `features/books/service.py`, `database/database.py`, `main.py`, `tests/test_app.py` |
+
+---
+
 ## 2026-10-02 — Bug fixes and cleanup
 
 ### New files
