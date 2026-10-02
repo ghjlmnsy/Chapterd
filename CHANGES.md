@@ -29,7 +29,7 @@
 | 6 | Stats said "(1 books)". | Says "1 book" / "2 books". | `features/books/view.py` |
 | 7 | Pressing Enter in the Username box did nothing; the password stayed filled after a failed login. | Enter in any login or register field submits. The password clears after a failed login. | `features/authentication/view.py` |
 | 8 | The main window had no minimize or maximize buttons. | Normal window buttons added. | `main.py` |
-| 9 | "Ann" and "ann" could be two different accounts. | Usernames are case-insensitive for both register and login. The welcome message uses the name as it was registered. | `database/database.py`, `features/authentication/service.py` |
+| 9 | "Jo" and "jo" could be two different accounts. | Usernames are case-insensitive for both register and login. The welcome message uses the name as it was registered. | `database/database.py`, `features/authentication/service.py` |
 | 10 | "Most-logged author" counted "J.K. Rowling" and "j.k. rowling" separately. | Authors are grouped ignoring case. | `database/database.py` |
 | 11 | The same book could be added twice. | Adding (or renaming to) a title + author already in your log shows an error. | `database/database.py`, `features/books/service.py` |
 | 12 | Popups said "LetterBook" while the app is called "Chapterd". | Popups and the window class (`ChapterdWindow`) now say Chapterd. | `features/books/view.py`, `main.py` |

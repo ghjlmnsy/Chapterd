@@ -99,8 +99,8 @@ class BookTests(AppTestCase):
             self.books.add_book("T", "A", "", "Reading", 0, "x" * 2001)
 
     def test_top_author_ignores_case(self):
-        self.books.add_book("Book 1", "Ann Author", "", "Reading", 0, "")
-        self.books.add_book("Book 2", "ann author", "", "Reading", 0, "")
+        self.books.add_book("Book 1", "Jo Author", "", "Reading", 0, "")
+        self.books.add_book("Book 2", "jo author", "", "Reading", 0, "")
         self.books.add_book("Book 3", "Other", "", "Reading", 0, "")
         _, count = self.books.summary_stats()["top_author"]
         self.assertEqual(count, 2)

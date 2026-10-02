@@ -103,7 +103,7 @@ class Database:
         """Returns {"id", "username"} if the credentials are valid, otherwise None."""
         with self.connect() as connection:
             row = connection.execute(
-                # COLLATE NOCASE: "Ann", "ann" and "ANN" all find the same account
+                # COLLATE NOCASE: "Jo", "jo" and "JO" all find the same account
                 "SELECT id, username, password FROM users WHERE username = ? COLLATE NOCASE",
                 (username.strip(),),
             ).fetchone()
@@ -190,7 +190,7 @@ class Database:
                 "SELECT status, COUNT(*) AS n FROM books WHERE user_id = ? GROUP BY status",
                 (user_id,),
             ).fetchall()
-            # group authors ignoring case so "Ann Author" and "ann author" count together
+            # group authors ignoring case so "Jo Author" and "jo author" count together
             top = connection.execute(
                 "SELECT author, COUNT(*) AS n FROM books WHERE user_id = ? "
                 "GROUP BY author COLLATE NOCASE ORDER BY n DESC, author COLLATE NOCASE LIMIT 1",
