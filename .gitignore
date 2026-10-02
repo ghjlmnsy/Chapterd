@@ -1,0 +1,19 @@
+# Python cache files (rebuilt automatically every time Python runs)
+__pycache__/
+*.py[cod]
+
+# Local database: holds your accounts and books, should never be shared
+*.db
+*.db-journal
+*.sqlite3
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Editor / OS clutter
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store

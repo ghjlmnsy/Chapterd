@@ -1,6 +1,7 @@
 import sys
 from pathlib import Path
 
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QApplication,
     QDialog,
@@ -19,13 +20,19 @@ from features.books.service import BookService
 from features.books.view import BookView
 
 
-class LetterBookWindow(QDialog):
+class ChapterdWindow(QDialog):
     def __init__(self, books, authentication):
         super().__init__()
         self.authentication = authentication
         self.logged_out = False
 
         self.setWindowTitle("Chapterd")
+        # QDialog has no minimize/maximize buttons by default; give it normal window controls
+        self.setWindowFlags(
+            Qt.WindowType.Window
+            | Qt.WindowType.WindowMinMaxButtonsHint
+            | Qt.WindowType.WindowCloseButtonHint
+        )
         self.resize(900, 700)
         self.setObjectName("mainContent")
 
@@ -88,7 +95,7 @@ def main():
         if login_dialog.exec() != QDialog.DialogCode.Accepted:
             return 0
 
-        window = LetterBookWindow(books, authentication)
+        window = ChapterdWindow(books, authentication)
         window.exec()
         if not window.logged_out:
             return 0

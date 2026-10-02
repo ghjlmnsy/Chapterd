@@ -2,9 +2,18 @@ import hashlib
 import hmac
 import os
 import sqlite3
+from contextlib import contextmanager
 from pathlib import Path
 
 STATUSES = ["Want to Read", "Reading", "Finished", "Dropped"]
+
+_STATUS_LIST_SQL = ", ".join(f"'{status}'" for status in STATUSES)
+_INVALID_BOOK_SQL = f"NEW.status NOT IN ({_STATUS_LIST_SQL}) OR NEW.rating NOT BETWEEN 0 AND 5"
+
+
+def _escape_like(text: str) -> str:
+    """Makes %, _ and \\ match literally inside a LIKE pattern (used with ESCAPE '\\')."""
+    return text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
 class Database:
@@ -15,16 +24,22 @@ class Database:
             else Path(__file__).resolve().parent.parent / "chapterd.db"
         )
 
-    def connect(self) -> sqlite3.Connection:
+    @contextmanager
+    def connect(self):
+        """Opens a connection, commits (or rolls back) on exit, and always closes it."""
         connection = sqlite3.connect(self.database_path)
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA foreign_keys = ON")
-        return connection
+        try:
+            with connection:
+                yield connection
+        finally:
+            connection.close()
 
     def create_tables(self) -> None:
         with self.connect() as connection:
             connection.executescript(
-                """
+                f"""
                 CREATE TABLE IF NOT EXISTS users (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     username TEXT NOT NULL UNIQUE,
@@ -41,6 +56,22 @@ class Database:
                     notes TEXT NOT NULL DEFAULT '',
                     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
                 );
+
+                -- usernames are unique regardless of upper/lower case
+                CREATE UNIQUE INDEX IF NOT EXISTS users_username_nocase
+                    ON users (username COLLATE NOCASE);
+
+                -- the database itself rejects invalid statuses and ratings
+                CREATE TRIGGER IF NOT EXISTS books_validate_insert
+                    BEFORE INSERT ON books WHEN {_INVALID_BOOK_SQL}
+                BEGIN
+                    SELECT RAISE(ABORT, 'invalid book status or rating');
+                END;
+                CREATE TRIGGER IF NOT EXISTS books_validate_update
+                    BEFORE UPDATE ON books WHEN {_INVALID_BOOK_SQL}
+                BEGIN
+                    SELECT RAISE(ABORT, 'invalid book status or rating');
+                END;
                 """
             )
 
@@ -51,7 +82,7 @@ class Database:
 
     def register(self, username: str, password: str) -> bool:
         username = username.strip()
-        if len(username) < 3 or len(password) < 4:
+        if len(username) < 3 or len(password) < 8:
             return False
         salt = os.urandom(16)
         stored = f"{salt.hex()}${self._hash(password, salt)}"
@@ -65,17 +96,20 @@ class Database:
         except sqlite3.IntegrityError:
             return False
 
-    def login(self, username: str, password: str) -> int | None:
-        """Returns the user id if the credentials are valid, otherwise None."""
+    def login(self, username: str, password: str) -> dict | None:
+        """Returns {"id", "username"} if the credentials are valid, otherwise None."""
         with self.connect() as connection:
             row = connection.execute(
-                "SELECT id, password FROM users WHERE username = ?", (username.strip(),)
+                "SELECT id, username, password FROM users WHERE username = ? COLLATE NOCASE",
+                (username.strip(),),
             ).fetchone()
         if row is None:
             return None
         salt_hex, stored_hash = row["password"].split("$")
         attempt = self._hash(password, bytes.fromhex(salt_hex))
-        return row["id"] if hmac.compare_digest(attempt, stored_hash) else None
+        if not hmac.compare_digest(attempt, stored_hash):
+            return None
+        return {"id": row["id"], "username": row["username"]}
 
     # ---------- book log ----------
     def add_book(self, user_id, title, author, genre="", status="Want to Read", rating=0, notes=""):
@@ -93,11 +127,12 @@ class Database:
             ).fetchall()
 
     def search_books(self, user_id, keyword):
-        like = f"%{keyword.strip()}%"
+        like = f"%{_escape_like(keyword.strip())}%"
         with self.connect() as connection:
             return connection.execute(
                 "SELECT * FROM books WHERE user_id = ? "
-                "AND (title LIKE ? OR author LIKE ? OR genre LIKE ?) ORDER BY id",
+                "AND (title LIKE ? ESCAPE '\\' OR author LIKE ? ESCAPE '\\' "
+                "OR genre LIKE ? ESCAPE '\\') ORDER BY id",
                 (user_id, like, like, like),
             ).fetchall()
 
@@ -106,6 +141,16 @@ class Database:
             return connection.execute(
                 "SELECT * FROM books WHERE id = ? AND user_id = ?", (book_id, user_id)
             ).fetchone()
+
+    def book_exists(self, user_id, title, author, exclude_id=None) -> bool:
+        """True if this user already logged a book with the same title and author (any case)."""
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT 1 FROM books WHERE user_id = ? "
+                "AND title = ? COLLATE NOCASE AND author = ? COLLATE NOCASE AND id IS NOT ?",
+                (user_id, title.strip(), author.strip(), exclude_id),
+            ).fetchone()
+        return row is not None
 
     def update_book(self, user_id, book_id, **fields) -> bool:
         allowed = {"title", "author", "genre", "status", "rating", "notes"}
@@ -118,14 +163,14 @@ class Database:
                 f"UPDATE books SET {assignments} WHERE id = ? AND user_id = ?",
                 (*fields.values(), book_id, user_id),
             )
-        return cursor.rowcount > 0
+            return cursor.rowcount > 0
 
     def remove_book(self, user_id, book_id) -> bool:
         with self.connect() as connection:
             cursor = connection.execute(
                 "DELETE FROM books WHERE id = ? AND user_id = ?", (book_id, user_id)
             )
-        return cursor.rowcount > 0
+            return cursor.rowcount > 0
 
     def summary_stats(self, user_id) -> dict:
         with self.connect() as connection:
@@ -139,7 +184,7 @@ class Database:
             ).fetchall()
             top = connection.execute(
                 "SELECT author, COUNT(*) AS n FROM books WHERE user_id = ? "
-                "GROUP BY author ORDER BY n DESC, author LIMIT 1",
+                "GROUP BY author COLLATE NOCASE ORDER BY n DESC, author COLLATE NOCASE LIMIT 1",
                 (user_id,),
             ).fetchone()
         counts = {status: 0 for status in STATUSES}
@@ -150,5 +195,3 @@ class Database:
             "by_status": counts,
             "top_author": (top["author"], top["n"]) if top else None,
         }
-
-

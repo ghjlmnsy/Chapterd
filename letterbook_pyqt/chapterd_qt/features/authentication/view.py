@@ -2,7 +2,7 @@ from PyQt6.QtWidgets import (
     QDialog, QFormLayout, QLabel, QLineEdit, QPushButton, QTabWidget, QVBoxLayout, QWidget,
 )
 
-from features.authentication.service import AuthenticationError
+from features.authentication.service import MAX_USERNAME_LENGTH, AuthenticationError
 
 
 class AuthenticationView(QDialog):
@@ -41,6 +41,7 @@ class AuthenticationView(QDialog):
         self.login_username = QLineEdit()
         self.login_password = QLineEdit()
         self.login_password.setEchoMode(QLineEdit.EchoMode.Password)
+        self.login_username.returnPressed.connect(self.handle_login)
         self.login_password.returnPressed.connect(self.handle_login)
         button = QPushButton("Log In")
         button.setObjectName("primaryButton")
@@ -56,9 +57,13 @@ class AuthenticationView(QDialog):
         self.reg_username = QLineEdit()
         self.reg_password = QLineEdit()
         self.reg_confirm = QLineEdit()
+        self.reg_username.setMaxLength(MAX_USERNAME_LENGTH)
+        self.reg_username.setPlaceholderText(f"3-{MAX_USERNAME_LENGTH} characters")
+        self.reg_password.setPlaceholderText("At least 8 characters")
         for field in (self.reg_password, self.reg_confirm):
             field.setEchoMode(QLineEdit.EchoMode.Password)
-        self.reg_confirm.returnPressed.connect(self.handle_register)
+        for field in (self.reg_username, self.reg_password, self.reg_confirm):
+            field.returnPressed.connect(self.handle_register)
         button = QPushButton("Create Account")
         button.setObjectName("primaryButton")
         button.clicked.connect(self.handle_register)
@@ -73,6 +78,8 @@ class AuthenticationView(QDialog):
             self.authentication.login(self.login_username.text(), self.login_password.text())
         except AuthenticationError as error:
             self.message.setText(str(error))
+            self.login_password.clear()
+            self.login_password.setFocus()
             return
         self.accept()
 

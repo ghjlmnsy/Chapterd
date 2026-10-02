@@ -1,3 +1,5 @@
+from html import escape
+
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QAbstractItemView, QComboBox, QFormLayout, QHBoxLayout, QHeaderView, QLabel,
@@ -6,7 +8,7 @@ from PyQt6.QtWidgets import (
 )
 
 from database.database import STATUSES
-from features.books.service import BookError
+from features.books.service import MAX_TEXT_LENGTH, BookError
 
 COLUMNS = ["ID", "Title", "Author", "Genre", "Status", "Rating"]
 
@@ -27,7 +29,7 @@ class BookTable(QTableWidget):
         self.blockSignals(True)
         self.setRowCount(len(books))
         for r, book in enumerate(books):
-            stars = "★" * book["rating"] + "☆" * (5 - book["rating"])
+            stars = "★" * book["rating"] + "☆" * (5 - book["rating"]) if book["rating"] else "Unrated"
             values = [book["id"], book["title"], book["author"], book["genre"], book["status"], stars]
             for c, value in enumerate(values):
                 item = QTableWidgetItem(str(value))
@@ -43,6 +45,16 @@ class BookTable(QTableWidget):
             return None
         return self.item(items[0].row(), 0).data(Qt.ItemDataRole.UserRole)
 
+    def select_book(self, book_id):
+        """Selects the row for book_id without emitting selection signals."""
+        self.blockSignals(True)
+        self.clearSelection()
+        for row in range(self.rowCount()):
+            if self.item(row, 0).data(Qt.ItemDataRole.UserRole)["id"] == book_id:
+                self.selectRow(row)
+                break
+        self.blockSignals(False)
+
 
 class BookForm(QWidget):
     def __init__(self):
@@ -52,11 +64,14 @@ class BookForm(QWidget):
         self.title = QLineEdit()
         self.author = QLineEdit()
         self.genre = QLineEdit()
+        for field in (self.title, self.author, self.genre):
+            field.setMaxLength(MAX_TEXT_LENGTH)
         self.status = QComboBox()
         self.status.addItems(STATUSES)
         self.rating = QSpinBox()
         self.rating.setRange(0, 5)
         self.rating.setSuffix(" / 5")
+        self.rating.setSpecialValueText("Unrated")  # shown instead of "0 / 5"
         self.notes = QPlainTextEdit()
         self.notes.setFixedHeight(70)
         form.addRow("Title", self.title)
@@ -69,6 +84,11 @@ class BookForm(QWidget):
     def values(self):
         return (self.title.text(), self.author.text(), self.genre.text(),
                 self.status.currentText(), self.rating.value(), self.notes.toPlainText())
+
+    def has_changes(self, book):
+        original = (book["title"], book["author"], book["genre"],
+                    book["status"], book["rating"], book["notes"])
+        return self.values() != original
 
     def set_book(self, book):
         self.title.setText(book["title"])
@@ -92,6 +112,7 @@ class BookView(QWidget):
     def __init__(self, books):
         super().__init__()
         self.books = books
+        self.editing_book = None  # the book currently loaded in the Update form
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -183,6 +204,8 @@ class BookView(QWidget):
 
     # ----- refresh -----
     def refresh(self):
+        self.editing_book = None
+        self.update_form.clear()
         books = self.books.view_books()
         self.log_table.load(books)
         self.update_table.load(books)
@@ -197,9 +220,15 @@ class BookView(QWidget):
 
     def refresh_stats(self):
         s = self.books.summary_stats()
-        rows = "".join(f"<tr><td>{k}</td><td><b>{v}</b></td></tr>" for k, v in s["by_status"].items())
+        rows = "".join(
+            f"<tr><td>{escape(k)}</td><td><b>{v}</b></td></tr>" for k, v in s["by_status"].items()
+        )
         avg = s["average_rating"] if s["average_rating"] is not None else "n/a"
-        top = f"{s['top_author'][0]} ({s['top_author'][1]} books)" if s["top_author"] else "n/a"
+        if s["top_author"]:
+            author, count = s["top_author"]
+            top = f"{escape(author)} ({count} {'book' if count == 1 else 'books'})"
+        else:
+            top = "n/a"
         self.stats_label.setText(
             f"<h2>Reading Summary</h2>"
             f"<p>Total books: <b>{s['total']}</b></p>"
@@ -210,7 +239,7 @@ class BookView(QWidget):
 
     # ----- actions -----
     def _error(self, error):
-        QMessageBox.warning(self, "LetterBook", str(error))
+        QMessageBox.warning(self, "Chapterd", str(error))
 
     def add_book(self):
         try:
@@ -219,24 +248,40 @@ class BookView(QWidget):
             return self._error(error)
         self.add_form.clear()
         self.refresh()
-        QMessageBox.information(self, "LetterBook", "Book added!")
+        QMessageBox.information(self, "Chapterd", "Book added!")
 
     def load_for_update(self):
         book = self.update_table.selected_book()
+        current = self.editing_book
+        if current is not None and self.update_form.has_changes(current):
+            if book is not None and book["id"] == current["id"]:
+                return
+            answer = QMessageBox.question(
+                self, "Unsaved Changes",
+                f'Discard your unsaved changes to "{current["title"]}"?',
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if answer != QMessageBox.StandardButton.Yes:
+                self.update_table.select_book(current["id"])
+                return
+        self.editing_book = book
         if book:
             self.update_form.set_book(book)
-            self.update_button.setEnabled(True)
+        else:
+            self.update_form.clear()
+        self.update_button.setEnabled(book is not None)
 
     def update_book(self):
-        book = self.update_table.selected_book()
+        book = self.editing_book
         if not book:
             return
         try:
             self.books.update_book(book["id"], *self.update_form.values())
         except BookError as error:
             return self._error(error)
-        self.update_form.clear()
         self.refresh()
+        QMessageBox.information(self, "Chapterd", "Changes saved!")
 
     def remove_book(self):
         book = self.remove_table.selected_book()
