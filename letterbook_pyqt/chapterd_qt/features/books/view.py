@@ -128,6 +128,8 @@ class BookView(QWidget):
         self.tabs.addTab(self._stats_tab(), "Summary Stats")
         self.tabs.addTab(self._update_tab(), "Update Book")
         self.tabs.addTab(self._remove_tab(), "Remove Book")
+        for index in range(self.tabs.count()):
+            self.tabs.widget(index).layout().setContentsMargins(20, 22, 20, 20)
         self.tabs.currentChanged.connect(lambda _: self.refresh())
         self.refresh()
 

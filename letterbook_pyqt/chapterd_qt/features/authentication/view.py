@@ -38,6 +38,7 @@ class AuthenticationView(QDialog):
     def _login_tab(self):
         page = QWidget()
         form = QFormLayout(page)
+        form.setContentsMargins(20, 20, 20, 20)  
         self.login_username = QLineEdit()
         self.login_password = QLineEdit()
         self.login_password.setEchoMode(QLineEdit.EchoMode.Password)
@@ -55,6 +56,7 @@ class AuthenticationView(QDialog):
     def _register_tab(self):
         page = QWidget()
         form = QFormLayout(page)
+        form.setContentsMargins(20, 20, 20, 20)
         self.reg_username = QLineEdit()
         self.reg_password = QLineEdit()
         self.reg_confirm = QLineEdit()
